@@ -12,5 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# FastAPI 起動設定 (ポート8000)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Cloud Run が注入する PORT 環境変数（デフォルト8080）を受け取る設定
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
