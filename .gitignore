@@ -31,6 +31,7 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
 
 # Downloads / Temporary video files
 *.mp4
@@ -53,3 +54,6 @@ temp/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# YouTube Cookie (機密情報のためGit管理から外す)
+cookies.txt

@@ -1,3 +1,4 @@
+# main.py
 import os
 import re
 import tempfile
@@ -15,10 +16,18 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=[
-        "Content-Disposition"
-    ],
+    expose_headers=["Content-Disposition"],
 )
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+cookie_file = os.path.join(BASE_DIR, "cookies.txt")
+
+print(f"=== [STARTUP CHECK] Cookie File Path: {cookie_file} ===")
+if os.path.exists(cookie_file):
+    file_size = os.path.getsize(cookie_file)
+    print(f"=== [STARTUP CHECK] SUCCESS: cookies.txt found! Size: {file_size} bytes ===")
+else:
+    print("=== [STARTUP CHECK] WARNING: cookies.txt NOT found in container! ===")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -26,7 +35,6 @@ def sanitize_filename(filename: str) -> str:
 
 
 def remove_file(path: str):
-    """レスポンス送信後に一時ファイルを削除する関数"""
     try:
         if os.path.exists(path):
             os.remove(path)
@@ -34,36 +42,51 @@ def remove_file(path: str):
         print(f"一時ファイルの削除エラー: {e}")
 
 
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "YouTube Downloader API"}
+
+
 @app.get("/download")
 async def download_video(
     background_tasks: BackgroundTasks,
     url: str = Query(..., description="YouTube Video URL"),
 ):
-    # 一時フォルダ内にランダムなファイルを作成
+    print(f"--- [REQUEST] Processing download for URL: {url} ---")
+
     temp_dir = tempfile.mkdtemp()
     output_template = os.path.join(temp_dir, "%(title)s.%(ext)s")
 
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
-        # 最高画質の映像と音声を結合してMP4で出力
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "bestvideo+bestaudio/best",  # 拡張子縛りを外す
         "outtmpl": output_template,
         "merge_output_format": "mp4",
+        "js_runtimes": {"node": {}},
+        "remote_components": ["ejs:github"],
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],  # androidを優先、webはフォールバック
+            }
+        },
     }
 
+    if os.path.exists(cookie_file):
+        size = os.path.getsize(cookie_file)
+        print(f"--- [yt-dlp] Using cookie file ({size} bytes): {cookie_file} ---")
+        ydl_opts["cookiefile"] = cookie_file
+    else:
+        print("--- [yt-dlp] WARNING: cookie file is NOT being used (file missing) ---")
+
     try:
-        # 1. yt-dlp で動画・音声を結合して一時フォルダへダウンロード
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-            # 拡張子が mp4 でない場合（結合後）のファイルパス調整
             base, _ = os.path.splitext(filename)
             final_filepath = f"{base}.mp4"
-            if not os.path.exists(final_filepath) and os.path.exists(
-                filename
-            ):
+            if not os.path.exists(final_filepath) and os.path.exists(filename):
                 final_filepath = filename
 
             raw_title = info.get("title", "video")
@@ -71,7 +94,6 @@ async def download_video(
         clean_title = sanitize_filename(raw_title)
         encoded_filename = quote(f"{clean_title}.mp4")
 
-        # 2. クライアントへのレスポンス完了後に一時ファイルを削除するようにバックグラウンドタスク登録
         background_tasks.add_task(remove_file, final_filepath)
         background_tasks.add_task(os.rmdir, temp_dir)
 
@@ -79,13 +101,13 @@ async def download_video(
             "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
 
-        # 3. ファイルを返却
+        print("--- [SUCCESS] Download complete, sending file response. ---")
         return FileResponse(
             path=final_filepath, media_type="video/mp4", headers=headers
         )
 
     except Exception as e:
-        # エラー発生時も一時ディレクトリをクリーンアップ
+        print(f"--- [ERROR] Download failed: {str(e)} ---")
         if os.path.exists(temp_dir):
             for f in os.listdir(temp_dir):
                 os.remove(os.path.join(temp_dir, f))
@@ -94,3 +116,4 @@ async def download_video(
         raise HTTPException(
             status_code=500, detail=f"エラーが発生しました: {str(e)}"
         )
+        

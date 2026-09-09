@@ -1,0 +1,9 @@
+services:
+  yt-downloader:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./cookies.txt:/app/cookies.txt  # cookie更新時に再ビルド不要にする
+    restart: unless-stopped
+    

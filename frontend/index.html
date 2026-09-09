@@ -79,10 +79,12 @@
     // ローカルテスト時: http://localhost:8000
     // Cloud Runデプロイ後: https://xxx-xxx-uc.a.run.app
     // 実行環境（ホスト名）に応じてバックエンドの接続先を自動切り替え
-    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isLocal = window.location.hostname === "localhost" 
+      || window.location.hostname === "127.0.0.1"
+      || window.location.hostname === "172.27.254.44";  // WSLのIPを追加
 
     const BACKEND_URL = isLocal
-      ? "http://localhost:8000"
+      ? "http://172.27.254.44:8000"  // WSLのIPに変更
       : "https://yt-backend-227530952407.asia-northeast1.run.app";
 
     const form = document.getElementById("downloadForm");

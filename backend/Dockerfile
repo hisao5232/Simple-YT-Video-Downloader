@@ -1,8 +1,14 @@
-FROM python:3.11-slim
+# Dockerfile
+FROM python:3.12-slim
 
-# ffmpeg のインストール (動画のエンコード/結合用)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js導入(js_runtimesで指定しているため必要)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -10,7 +16,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY main.py .
+COPY cookies.txt .
 
-# Cloud Run が注入する PORT 環境変数（デフォルト8080）を受け取る設定
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
