@@ -76,16 +76,20 @@
 
   <script>
     // ★バックエンドのURLを設定★
-    // ローカルテスト時: http://localhost:8000
-    // Cloud Runデプロイ後: https://xxx-xxx-uc.a.run.app
-    // 実行環境（ホスト名）に応じてバックエンドの接続先を自動切り替え
+    // ローカルテスト時: WSLのIP経由でDocker上のバックエンドへ
+    // 本番(Cloudflare Pages等): Cloudflare Tunnel経由のURLへ
     const isLocal = window.location.hostname === "localhost" 
       || window.location.hostname === "127.0.0.1"
-      || window.location.hostname === "172.27.254.44";  // WSLのIPを追加
+      || window.location.hostname === "172.27.254.44";  // WSLのIP
 
     const BACKEND_URL = isLocal
-      ? "http://172.27.254.44:8000"  // WSLのIPに変更
-      : "https://yt-backend-227530952407.asia-northeast1.run.app";
+      ? "http://172.27.254.44:8000"  // WSLのIP
+      : "https://yt-api.go-pro-world.net";  // Cloudflare Tunnel経由
+
+    // ★APIキー★
+    // main.py / .env の API_KEY と同じ値にする
+    // ブラウザの開発者ツールから見えるため、簡易的なアクセス制限であることに留意
+    const API_KEY = "mown32.2reesssFFDSfsby";
 
     const form = document.getElementById("downloadForm");
     const videoUrlInput = document.getElementById("videoUrl");
@@ -108,7 +112,11 @@
 
       try {
         const downloadEndpoint = `${BACKEND_URL}/download?url=${encodeURIComponent(url)}`;
-        const response = await fetch(downloadEndpoint);
+        const response = await fetch(downloadEndpoint, {
+          headers: {
+            "x-api-key": API_KEY
+          }
+        });
 
         if (!response.ok) {
           let errorDetail = "動画の取得に失敗しました。";

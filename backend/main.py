@@ -3,10 +3,13 @@ import os
 import re
 import tempfile
 from urllib.parse import quote
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from dotenv import load_dotenv
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import yt_dlp
+
+load_dotenv()  # .envファイルを読み込む
 
 app = FastAPI()
 
@@ -21,6 +24,7 @@ app.add_middleware(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 cookie_file = os.path.join(BASE_DIR, "cookies.txt")
+API_KEY = os.getenv("API_KEY", "changeme")  # .envから読み込み、未設定ならchangeme
 
 print(f"=== [STARTUP CHECK] Cookie File Path: {cookie_file} ===")
 if os.path.exists(cookie_file):
@@ -51,7 +55,11 @@ def read_root():
 async def download_video(
     background_tasks: BackgroundTasks,
     url: str = Query(..., description="YouTube Video URL"),
+    x_api_key: str = Header(...),
 ):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
     print(f"--- [REQUEST] Processing download for URL: {url} ---")
 
     temp_dir = tempfile.mkdtemp()
@@ -60,14 +68,14 @@ async def download_video(
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
-        "format": "bestvideo+bestaudio/best",  # 拡張子縛りを外す
+        "format": "bestvideo+bestaudio/best",
         "outtmpl": output_template,
         "merge_output_format": "mp4",
         "js_runtimes": {"node": {}},
         "remote_components": ["ejs:github"],
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],  # androidを優先、webはフォールバック
+                "player_client": ["android", "web"]
             }
         },
     }
